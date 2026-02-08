@@ -5,9 +5,9 @@ import os
 # ==========================================
 # CONFIGURATION
 # ==========================================
-HA_TOKEN = "INSERT_YOUR_LONG_LIVED_ACCESS_TOKEN_HERE"
+HA_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJmMzM5YzljNzcwNzA0MGJiYTZjY2E1MGJjZTI1NmRjZCIsImlhdCI6MTc3MDUxNzcxMSwiZXhwIjoyMDg1ODc3NzExfQ.nh9S1CQAgkP87ZwEoHclEr7jTHyKam74TWjvC7PTbzM"
 HA_URL = "http://homeassistant.local:8123" 
-GEMINI_API_KEY = "INSERT_YOUR_GEMINI_API_KEY_HERE"
+GEMINI_API_KEY = "AIzaSyCeixrtiyoXUeAVzwJJC54QfvVia1Wp0EI"
 # ==========================================
 
 def get_ha_states():
@@ -17,6 +17,16 @@ def get_ha_states():
         "Authorization": f"Bearer {HA_TOKEN}",
         "content-type": "application/json",
     }
+
+    # --- TUKAJ DODAJ SVOJE VZDEVKE (ALIASES) ---
+    # Format: "entity_id": "Vzdevek"
+    # Entity ID najdeš v Home Assistantu pod Settings -> Devices -> Entities
+    CUSTOM_ALIASES = {
+        "light.garage_main_light_minir2_esp_light": "Bubble",
+        "light.dnevna_soba": "Big Light",
+        "cover.blinds_bedroom": "Morning Blinds"
+    }
+    # -------------------------------------------
 
     try:
         print("🔌 Connecting to Home Assistant...")
@@ -36,11 +46,21 @@ def get_ha_states():
             for entity in data:
                 entity_id = entity['entity_id']
                 state = entity['state']
+                
+                # Get the default friendly name from HA
                 friendly_name = entity.get('attributes', {}).get('friendly_name', entity_id)
+                
+                # --- CHECK FOR ALIAS (PREVERI VZDEVEK) ---
+                if entity_id in CUSTOM_ALIASES:
+                    nickname = CUSTOM_ALIASES[entity_id]
+                    # We modify the name so Gemini sees both
+                    friendly_name = f"{friendly_name} (Alias: {nickname})"
+                # -----------------------------------------
                 
                 if state in ["unavailable", "unknown"]: continue
                 if any(word in friendly_name for word in blocked_words): continue
 
+                # Filter for specific device types
                 if any(x in entity_id for x in ['light.', 'switch.', 'sensor.', 'climate.', 'cover.', 'lock.']):
                     state_text += f"- {friendly_name} ({entity_id}): {state}\n"
                     count += 1
@@ -51,46 +71,3 @@ def get_ha_states():
             return f"Error: Home Assistant returned code {response.status_code}"
     except Exception as e:
         return f"Connection Error: {e}"
-
-def main():
-    print("\n--- 🤖 GEMINI HOME AGENT (CLI v3.0) 🤖 ---\n")
-    
-    house_state = get_ha_states()
-    
-    if "Error" in house_state:
-        print(house_state)
-        return
-
-    try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        MODEL_NAME = "gemini-2.0-flash" 
-
-        print(f"🧠 Initializing model {MODEL_NAME}...")
-
-        chat = client.chats.create(model=MODEL_NAME)
-        
-        system_instruction = (
-            "You are a smart home assistant. Below is the current status of all devices.\n"
-            "Your task: Answer questions about the house. Be brief and friendly.\n"
-            f"{house_state}"
-        )
-
-        print("📤 Sending context to Gemini...")
-        response = chat.send_message(system_instruction)
-        
-        print(f"\nGemini: {response.text}\n")
-        print("💬 Agent ready! (Type 'exit' to quit)\n")
-
-        while True:
-            user_input = input("You: ")
-            if user_input.lower() in ['exit', 'quit', 'stop']:
-                break
-            
-            response = chat.send_message(user_input)
-            print(f"Gemini: {response.text}")
-
-    except Exception as e:
-        print(f"\n❌ Gemini Error: {e}")
-
-if __name__ == "__main__":
-    main()

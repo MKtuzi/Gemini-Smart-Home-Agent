@@ -1,144 +1,154 @@
 import streamlit as st
 from google import genai
+from google.genai import types
 import requests
 import os
-import json
 
-# ==========================================
-# CONFIGURATION (Users must fill this in!)
-# ==========================================
-HA_TOKEN = "INSERT_YOUR_LONG_LIVED_ACCESS_TOKEN_HERE"
-HA_URL = "http://homeassistant.local:8123" 
-GEMINI_API_KEY = "INSERT_YOUR_GEMINI_API_KEY_HERE"
-# ==========================================
+# --- KONFIGURACIJA (Vnesi svoje podatke ali uporabi secrets) ---
+# Če imaš te podatke v drugi datoteki, jih uvozi, sicer jih prilepi sem:
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+HA_TOKEN = st.secrets["HA_TOKEN"]
+HA_URL = st.secrets["HA_URL"]
 
-HISTORY_FILE = "chat_history.json"
+st.set_page_config(page_title="Gemini Home Manager", page_icon="🏠", layout="wide")
+st.title("🏠 Gemini Smart Home Manager")
 
-# --- Function to get Home Assistant States ---
+# --- 1. FUNKCIJA ZA BRANJE STANJA (GET) ---
 def get_ha_states():
-    """Fetches the current state of devices from Home Assistant."""
     url = f"{HA_URL}/api/states"
-    headers = {
-        "Authorization": f"Bearer {HA_TOKEN}",
-        "content-type": "application/json",
-    }
+    headers = {"Authorization": f"Bearer {HA_TOKEN}", "content-type": "application/json"}
     try:
         response = requests.get(url, headers=headers, timeout=5)
         if response.status_code == 200:
             data = response.json()
-            state_text = "CURRENT HOUSE STATE:\n"
+            lines = []
+            blocked = ["Voltage", "Current", "Energy", "Power", "SSID", "IP", "update"]
             
-            # Filter out technical noise to save tokens and confusion
-            blocked_words = [
-                "Voltage", "Current", "Power factor", "Frequency", "Energy", 
-                "Apparent power", "CPU", "SSID", "IP", "Uptime", "Signal strength"
-            ]
-            
-            count = 0
             for entity in data:
-                entity_id = entity['entity_id']
+                eid = entity['entity_id']
                 state = entity['state']
-                friendly_name = entity.get('attributes', {}).get('friendly_name', entity_id)
+                name = entity.get('attributes', {}).get('friendly_name', eid)
                 
-                # Filter out unavailable devices
                 if state in ["unavailable", "unknown"]: continue
+                if any(b in name for b in blocked): continue
                 
-                # Filter out technical sensors based on keywords
-                if any(b in friendly_name for b in blocked_words): continue
-
-                # Filter by domain (what we actually care about)
-                if any(x in entity_id for x in ['light.', 'switch.', 'sensor.', 'climate.', 'weather.', 'person.', 'cover.', 'lock.', 'media_player.']):
-                    state_text += f"- {friendly_name} ({entity_id}): {state}\n"
-                    count += 1
-            return True, state_text
-        return False, "Error: Could not connect to Home Assistant."
+                # Filtriramo samo pomembne naprave
+                if any(x in eid for x in ['light.', 'switch.', 'cover.', 'climate.', 'lock.']):
+                    lines.append(f"- {name} (ID: {eid}) is {state}")
+            return "\n".join(lines)
+        return "Error reading HA."
     except Exception as e:
-        return False, f"Connection Error: {e}"
+        return f"Connection Error: {e}"
 
-# --- Memory Functions ---
-def load_history():
-    if os.path.exists(HISTORY_FILE):
-        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+# --- 2. FUNKCIJA ZA UKAZOVANJE (POST) - "ROKE" ---
+def call_ha_service(service_call, entity_id):
+    """Izvede akcijo, npr. ugasne luč."""
+    # service_call pride v formatu "light.turn_off"
+    domain, service = service_call.split(".")
+    url = f"{HA_URL}/api/services/{domain}/{service}"
+    headers = {"Authorization": f"Bearer {HA_TOKEN}", "content-type": "application/json"}
+    payload = {"entity_id": entity_id}
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        if response.status_code == 200:
+            return True
+        else:
+            print(f"Error: {response.text}")
+            return False
+    except Exception as e:
+        print(f"Exception: {e}")
+        return False
 
-def save_history(messages):
-    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(messages, f, ensure_ascii=False, indent=4)
+# --- 3. GEMINI CLIENT ---
+@st.cache_resource
+def get_client():
+    return genai.Client(api_key=GEMINI_API_KEY)
 
-# --- MAIN APPLICATION ---
-st.set_page_config(page_title="Gemini Smart Home", page_icon="🏡")
+client = get_client()
 
-st.title("🏡 My Smart Home (AI Agent)")
-
-# 1. Initialize Session State
+# --- 4. ZGODOVINA POGOVORA ---
 if "messages" not in st.session_state:
-    st.session_state.messages = load_history()
+    st.session_state.messages = []
 
-# 2. Sidebar Controls
-with st.sidebar:
-    st.header("Controls")
-    if st.button("🔄 Refresh House State"):
-        st.cache_data.clear()
-        st.success("State refreshed!")
+# Prikaži zgodovino
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# --- 5. LOGIKA AGENTA ---
+if prompt := st.chat_input("Npr: Ugasni luč v garaži"):
     
-    if st.button("🗑️ Clear Chat History"):
-        st.session_state.messages = []
-        save_history([])
-        st.rerun()
-
-# 3. Display Chat History
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# 4. Chat Input
-if prompt := st.chat_input("Ask me about the house... (e.g., Are the lights on?)"):
-    
-    # Display user message
+    # 1. Prikaži uporabnikovo sporočilo
     with st.chat_message("user"):
         st.markdown(prompt)
-    
-    # Add to session history
     st.session_state.messages.append({"role": "user", "content": prompt})
+
+    # 2. Pridobi sveže stanje hiše
+    house_data = get_ha_states()
+
+    # 3. Sistemska navodila (Navodila za možgane)
+    # TUKAJ JE TRIK: Naučimo ga, da izpiše poseben ukaz, če želi nekaj narediti.
+    system_instruction = f"""
+    You are a Smart Home Manager. 
+    Current House State:
+    {house_data}
+
+    YOUR RULES:
+    1. If the user asks a question, answer briefly based on the state above.
+    2. IF THE USER WANTS TO CHANGE SOMETHING (turn on/off, open/close):
+       DO NOT ask "Do you want me to?". Just DO IT.
+       To do it, output a command in this EXACT format:
+       ### ACTION: domain.service | entity_id
+       
+       Examples:
+       User: "Turn off garage light" -> Output: ### ACTION: light.turn_off | light.garaza_main
+       User: "Open blinds" -> Output: ### ACTION: cover.open_cover | cover.bedroom_blinds
     
-    # --- GENERATE RESPONSE ---
-    with st.chat_message("assistant"):
-        message_placeholder = st.empty()
-        message_placeholder.markdown("⏳ *Checking house sensors...*")
-        
-        # A) Get fresh data
-        success, house_state = get_ha_states()
-        
-        if not success:
-             message_placeholder.error(house_state)
-             st.stop()
+    3. If you output an action, add a short confirmation text after it.
+    """
 
-        # B) Prepare prompt for Gemini
-        full_prompt = (
-            f"You are a helpful smart home assistant. The user asks: '{prompt}'.\n"
-            f"Here is the LIVE STATUS of the house devices:\n{house_state}\n\n"
-            "Rules:\n"
-            "1. Answer based ONLY on the provided status.\n"
-            "2. Be concise and friendly.\n"
-            "3. If the user asks about something not in the list, say you don't know."
-        )
+    # 4. Sestavimo celoten kontekst (Zgodovina + Novo stanje)
+    # Da ne pozabi, o čem sva govorila, mu pošljemo prejšnja sporočila
+    full_conversation = system_instruction + "\n\nChat History:\n"
+    for msg in st.session_state.messages[-5:]: # Zadnjih 5 sporočil za kontekst
+        full_conversation += f"{msg['role'].upper()}: {msg['content']}\n"
+    
+    full_conversation += f"USER: {prompt}\nASSISTANT:"
 
+    # 5. Klic AI
+    with st.spinner("Thinking..."):
         try:
-            # C) Call Gemini 2.0 Flash
-            client = genai.Client(api_key=GEMINI_API_KEY)
             response = client.models.generate_content(
                 model="gemini-2.0-flash",
-                contents=full_prompt
+                contents=full_conversation
             )
-            bot_response = response.text
+            reply_text = response.text
             
-            # D) Display response
-            message_placeholder.markdown(bot_response)
-            
-            # E) Save to history
-            st.session_state.messages.append({"role": "assistant", "content": bot_response})
-            save_history(st.session_state.messages)
-            
+            # 6. DETEKTIV ZA UKAZE (Ali je Gemini poslal ukaz?)
+            if "### ACTION:" in reply_text:
+                # Razčleni ukaz
+                parts = reply_text.split("### ACTION:")[1].strip().split("|")
+                service_call = parts[0].strip() # npr. light.turn_off
+                entity_id = parts[1].strip().split()[0] # npr. light.garaza
+                
+                # Izvedi ukaz v Home Assistantu
+                success = call_ha_service(service_call, entity_id)
+                
+                if success:
+                    final_reply = f"✅ Opravljeno! ({service_call} -> {entity_id})"
+                else:
+                    final_reply = f"❌ Napaka pri klicanju Home Assistanta."
+                
+                # Odstrani tehnični ukaz iz odgovora, da bo lepše izgledalo
+                clean_reply = reply_text.split("### ACTION:")[0] + "\n" + final_reply
+            else:
+                clean_reply = reply_text
+
+            # 7. Izpiši odgovor
+            with st.chat_message("assistant"):
+                st.markdown(clean_reply)
+            st.session_state.messages.append({"role": "assistant", "content": clean_reply})
+
         except Exception as e:
-            message_placeholder.error(f"Gemini API Error: {e}")
+            st.error(f"Error: {e}")

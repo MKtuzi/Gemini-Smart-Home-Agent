@@ -1,5 +1,11 @@
+# Ignore virtual environment (the 500MB folder)
 venv/
+.venv/
+env/
 __pycache__/
-*.pyc
-chat_history.json
-.env
+
+# Ignore secrets (NEVER upload passwords)
+.streamlit/secrets.toml
+
+# Ignore system files
+.DS_Store
