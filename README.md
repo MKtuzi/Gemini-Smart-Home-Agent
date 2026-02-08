@@ -1,5 +1,7 @@
 # 🏠 Gemini Smart Home Agent (v4.0)
 
+![App Screenshot](screenshot.png)
+
 A personalized AI Agent powered by **Google Gemini 2.0 Flash** that can talk to your **Home Assistant**. It doesn't just read data—it can control your home!
 
 ## 🚀 Features (Kaj zna)
