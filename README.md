@@ -35,6 +35,7 @@ Before you begin, ensure you have:
 2.  **Create a Virtual Environment (Optional but recommended):**
     ```bash
     # Windows
+    # (or py for python)
     python -m venv venv
     .\venv\Scripts\activate
 
