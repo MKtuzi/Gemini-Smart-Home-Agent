@@ -42,8 +42,6 @@ To keep your passwords safe, this app uses a specific file that is not shared on
 Inside the Gemini-Smart-Home-Agent folder, create a new folder named .streamlit.
 Inside that folder, create a new text file named secrets.toml.
 
-File structure should look like this:
-Plaintext
 Gemini-Smart-Home-Agent/
 ├── .streamlit/
 │   └── secrets.toml   <-- You create this file
@@ -52,10 +50,9 @@ Gemini-Smart-Home-Agent/
 └── ...
 Content of secrets.toml: Open the file with a text editor (like Notepad or VS Code) and paste this:
 
-Ini, TOML
 GEMINI_API_KEY = "YOUR_GOOGLE_API_KEY_HERE"
 HA_TOKEN = "YOUR_LONG_LIVED_ACCESS_TOKEN_FROM_HA"
-HA_URL = "[http://192.168.x.xx:8123](http://192.168.x.xx:8123)"
+HA_URL = "[http://192.168.x.xx:8123]"
 
 (Note: Replace the URL above with your actual Home Assistant IP address)
 
