@@ -28,6 +28,7 @@ This Python application connects directly to your **Home Assistant** instance, a
 
 ### 2. Clone the repository
 Open your terminal (Command Prompt or PowerShell) and run:
+
 ```bash
 git clone [https://github.com/MKtuzi/Gemini-Smart-Home-Agent.git](https://github.com/MKtuzi/Gemini-Smart-Home-Agent.git)
 cd Gemini-Smart-Home-Agent
