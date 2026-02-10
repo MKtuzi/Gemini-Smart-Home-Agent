@@ -1,61 +1,32 @@
-# 🏠 Gemini Smart Home Agent (v4.0)
+# 🏠 Gemini Smart Home Agent v5.0
 
-![App Screenshot](demo_v2.png)
+A powerful, lightweight, and voice-enabled Smart Home Assistant powered by **Google Gemini 2.0 Flash**.
+This Python application connects directly to your **Home Assistant** instance, allowing you to control your home using natural language (Voice or Text).
 
-A personalized AI Agent powered by **Google Gemini 2.0 Flash** that connects directly to your **Home Assistant**. It doesn't just read data—it can control your home (lights, blinds, switches) using natural language!
+![Demo](demo_v2.png)
 
-## 🚀 Features (Kaj zna)
-- **🧠 Natural Language Understanding:** Understands context, follow-up questions, and aliases (e.g., "Bubble" for garage light).
-- **👀 Live House State:** Reads real-time status of lights, switches, covers, and sensors.
-- **⚡ Active Control:** Can turn devices ON/OFF, open/close blinds, and unlock doors upon request.
-- **🛡️ Secure:** Uses strict file handling (secrets are hidden in `.streamlit/secrets.toml`) and runs locally via Streamlit.
+## 🚀 New in v5.0
+- **🗣️ Natural Voice Output:** Uses Microsoft Edge TTS (Petra Neural) for high-quality Slovenian/English speech.
+- **🌦️ Advanced Weather:** Reads 5-day forecasts directly from Home Assistant's `weather.get_forecasts` service.
+- **🧠 Smart Context:** Understands slang (e.g., "Buben" = Bubble Light) and filters out system noise.
+- **🎙️ Walkie-Talkie Mode:** Improved microphone handling for faster commands.
 
-## 🛑 Limitations (Česa (še) ne zna)
-- **No Dashboard Editing:** Cannot modify Lovelace dashboards or UI cards.
-- **No Permanent Automations:** Can execute commands *now*, but cannot create background schedules in Home Assistant directly.
+## 🛠️ Features
+- **Control Devices:** Turn lights on/off, open blinds, lock doors.
+- **Query State:** "Is the garage door open?", "What's the temperature in the living room?"
+- **Future Cast:** "Will it rain tomorrow?" (Uses real forecast data).
+- **Secure:** API keys are stored safely in `.streamlit/secrets.toml`.
 
 ---
 
-## 🛠️ Installation & Setup
-
-Follow these steps to run the agent on your own computer (Windows).
+## 📦 Installation & Setup
 
 ### 1. Prerequisites
 - Python 3.10 or newer.
-- A **Home Assistant** instance (local IP).
-- A **Gemini API Key** (from Google AI Studio).
+- A **Home Assistant** instance (accessible via LAN or Nabu Casa).
+- A **Google Gemini API Key** (Get it free at [Google AI Studio](https://aistudio.google.com/)).
 
-### 2. Download the code
-Clone this repository or download the ZIP file.
-
-### 3. Set up the environment (Windows)
-Open your terminal (PowerShell) in the project folder and run:
-
-```powershell
-# 1. Create a virtual environment
-py -m venv venv
-
-# 2. Activate the environment
-.\venv\Scripts\activate
-
-# 3. Install dependencies
-pip install -r requirements.txt
-
-4. Configure Secrets (Important!) 🔐
-This agent uses a secure way to store passwords so they don't end up on GitHub.
-
-Create a new folder named .streamlit inside your project folder.
-
-Inside that folder, create a file named secrets.toml.
-
-Paste your keys into secrets.toml:
-
-GEMINI_API_KEY = "your_google_api_key_here"
-HA_TOKEN = "your_home_assistant_token_here"
-HA_URL = "[http://192.168.](http://192.168.)x.x:8123"
-
-5. Run the App 🚀
-Run this command in your terminal:
-
-PowerShell
-py -m streamlit run app.py
+### 2. Clone the repository
+```bash
+git clone [https://github.com/MKtuzi/Gemini-Smart-Home-Agent.git](https://github.com/MKtuzi/Gemini-Smart-Home-Agent.git)
+cd Gemini-Smart-Home-Agent
