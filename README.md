@@ -37,8 +37,9 @@ cd Gemini-Smart-Home-Agent
 3. Install dependencies
 Install the required Python libraries by running:
 
-Bash
+```bash
 pip install -r requirements.txt
+```
 
 4. Configure Secrets (CRITICAL 🔐)
 To keep your passwords safe, this app uses a specific file that is not shared on the internet.
